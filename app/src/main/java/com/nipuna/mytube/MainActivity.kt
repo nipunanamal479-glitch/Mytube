@@ -1,30 +1,41 @@
 package com.nipuna.mytube
 
-import android.annotation.SuppressLint
-import android.graphics.Bitmap
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private lateinit var progressBar: ProgressBar
+    private lateinit var searchEditText: EditText
+    private lateinit var searchButton: ImageButton
+    private lateinit var recyclerView: RecyclerView
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var loadingProgressBar: ProgressBar
     private lateinit var emptyStateLayout: LinearLayout
+    private lateinit var emptyStateTextView: TextView
 
-    private val homeUrl = "https://m.youtube.com"
+    private lateinit var adapter: VideoAdapter
+    private var lastQuery: String = ""
+
+    private val apiKey: String
+        get() = BuildConfig.YOUTUBE_API_KEY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
@@ -41,26 +52,111 @@ class MainActivity : AppCompatActivity() {
             super.onCreate(savedInstanceState)
             setContentView(R.layout.activity_main)
 
-            val toolbar = findViewById<Toolbar>(R.id.toolbar)
-            setSupportActionBar(toolbar)
-            supportActionBar?.setDisplayShowTitleEnabled(false)
-
-            webView = findViewById(R.id.webView)
-            progressBar = findViewById(R.id.progressBar)
+            searchEditText = findViewById(R.id.searchEditText)
+            searchButton = findViewById(R.id.searchButton)
+            recyclerView = findViewById(R.id.recyclerView)
             swipeRefresh = findViewById(R.id.swipeRefresh)
+            loadingProgressBar = findViewById(R.id.loadingProgressBar)
             emptyStateLayout = findViewById(R.id.emptyStateLayout)
+            emptyStateTextView = findViewById(R.id.emptyStateTextView)
 
-            setupWebView()
+            setupRecyclerView()
+            setupSearch()
             setupSwipeRefresh()
 
-            if (savedInstanceState != null) {
-                webView.restoreState(savedInstanceState)
-            } else {
-                webView.loadUrl(homeUrl)
-            }
         } catch (e: Exception) {
             showCrashScreen(e.stackTraceToString())
         }
+    }
+
+    private fun setupRecyclerView() {
+        adapter = VideoAdapter { videoId, title ->
+            val intent = Intent(this, PlayerActivity::class.java)
+            intent.putExtra("VIDEO_ID", videoId)
+            intent.putExtra("VIDEO_TITLE", title)
+            startActivity(intent)
+        }
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
+    }
+
+    private fun setupSearch() {
+        searchButton.setOnClickListener {
+            performSearch()
+        }
+
+        searchEditText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+        swipeRefresh.setColorSchemeResources(R.color.accent_teal)
+        swipeRefresh.setProgressBackgroundColorSchemeResource(R.color.surface_dark)
+        swipeRefresh.setOnRefreshListener {
+            if (lastQuery.isNotBlank()) {
+                performSearch(lastQuery)
+            } else {
+                swipeRefresh.isRefreshing = false
+            }
+        }
+    }
+
+    private fun performSearch(overrideQuery: String? = null) {
+        val query = overrideQuery ?: searchEditText.text.toString().trim()
+        if (query.isBlank()) {
+            Toast.makeText(this, "Search karanna videos type karanna", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        lastQuery = query
+        emptyStateLayout.visibility = View.GONE
+        loadingProgressBar.visibility = View.VISIBLE
+
+        if (apiKey.isBlank()) {
+            loadingProgressBar.visibility = View.GONE
+            swipeRefresh.isRefreshing = false
+            showEmptyState("API key eka missing. build.gradle check karanna.")
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.instance.searchVideos(query = query, apiKey = apiKey)
+                }
+
+                loadingProgressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+
+                if (response.isSuccessful) {
+                    val items = response.body()?.items.orEmpty()
+                    if (items.isEmpty()) {
+                        showEmptyState("Results hambune nae. Wena keyword ekak try karanna.")
+                    } else {
+                        adapter.submitList(items)
+                    }
+                } else {
+                    val code = response.code()
+                    showEmptyState("Error: HTTP $code. API key/quota check karanna.")
+                }
+            } catch (e: Exception) {
+                loadingProgressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+                showEmptyState("Network error: ${e.message}")
+            }
+        }
+    }
+
+    private fun showEmptyState(message: String) {
+        adapter.clear()
+        emptyStateTextView.text = message
+        emptyStateLayout.visibility = View.VISIBLE
     }
 
     private fun showCrashScreen(errorText: String) {
@@ -74,83 +170,5 @@ class MainActivity : AppCompatActivity() {
         textView.setTextIsSelectable(true)
         scrollView.addView(textView)
         setContentView(scrollView)
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebView() {
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            loadWithOverviewMode = true
-            useWideViewPort = true
-            mediaPlaybackRequiresUserGesture = false
-        }
-
-        webView.webViewClient = object : WebViewClient() {
-
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                emptyStateLayout.visibility = View.GONE
-                progressBar.visibility = View.VISIBLE
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                progressBar.visibility = View.GONE
-                swipeRefresh.isRefreshing = false
-            }
-
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?
-            ) {
-                super.onReceivedError(view, request, error)
-                if (request?.isForMainFrame == true) {
-                    progressBar.visibility = View.GONE
-                    swipeRefresh.isRefreshing = false
-                    emptyStateLayout.visibility = View.VISIBLE
-                }
-            }
-        }
-
-        webView.webChromeClient = object : android.webkit.WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                progressBar.progress = newProgress
-                progressBar.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
-            }
-        }
-    }
-
-    private fun setupSwipeRefresh() {
-        swipeRefresh.setColorSchemeResources(R.color.accent_teal)
-        swipeRefresh.setProgressBackgroundColorSchemeResource(R.color.surface_dark)
-        swipeRefresh.setOnRefreshListener {
-            webView.reload()
-        }
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        if (::webView.isInitialized) {
-            webView.saveState(outState)
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
-    }
-
-    override fun onDestroy() {
-        if (::webView.isInitialized) {
-            webView.destroy()
-        }
-        super.onDestroy()
     }
 }
