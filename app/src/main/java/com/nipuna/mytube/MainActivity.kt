@@ -2,6 +2,7 @@ package com.nipuna.mytube
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebResourceError
@@ -10,6 +11,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -23,28 +26,55 @@ class MainActivity : AppCompatActivity() {
 
     private val homeUrl = "https://m.youtube.com"
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-
-        webView = findViewById(R.id.webView)
-        progressBar = findViewById(R.id.progressBar)
-        swipeRefresh = findViewById(R.id.swipeRefresh)
-        emptyStateLayout = findViewById(R.id.emptyStateLayout)
-
-        setupWebView()
-        setupSwipeRefresh()
-
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-        } else {
-            webView.loadUrl(homeUrl)
+        // Global crash catcher - error eka screen ekema penna
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+            runOnUiThread {
+                try {
+                    showCrashScreen(throwable.stackTraceToString())
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
         }
+
+        try {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_main)
+
+            val toolbar = findViewById<Toolbar>(R.id.toolbar)
+            setSupportActionBar(toolbar)
+            supportActionBar?.setDisplayShowTitleEnabled(false)
+
+            webView = findViewById(R.id.webView)
+            progressBar = findViewById(R.id.progressBar)
+            swipeRefresh = findViewById(R.id.swipeRefresh)
+            emptyStateLayout = findViewById(R.id.emptyStateLayout)
+
+            setupWebView()
+            setupSwipeRefresh()
+
+            if (savedInstanceState != null) {
+                webView.restoreState(savedInstanceState)
+            } else {
+                webView.loadUrl(homeUrl)
+            }
+        } catch (e: Exception) {
+            showCrashScreen(e.stackTraceToString())
+        }
+    }
+
+    private fun showCrashScreen(errorText: String) {
+        val scrollView = ScrollView(this)
+        val textView = TextView(this)
+        textView.text = "CRASH ERROR:\n\n$errorText"
+        textView.setTextColor(Color.WHITE)
+        textView.setBackgroundColor(Color.BLACK)
+        textView.textSize = 12f
+        textView.setPadding(24, 24, 24, 24)
+        textView.setTextIsSelectable(true)
+        scrollView.addView(textView)
+        setContentView(scrollView)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -55,7 +85,6 @@ class MainActivity : AppCompatActivity() {
             loadWithOverviewMode = true
             useWideViewPort = true
             mediaPlaybackRequiresUserGesture = false
-            userAgentString = userAgentString?.replace("; wv", "")
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -90,11 +119,7 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
                 progressBar.progress = newProgress
-                if (newProgress >= 100) {
-                    progressBar.visibility = View.GONE
-                } else {
-                    progressBar.visibility = View.VISIBLE
-                }
+                progressBar.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
             }
         }
     }
@@ -109,12 +134,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        webView.saveState(outState)
+        if (::webView.isInitialized) {
+            webView.saveState(outState)
+        }
     }
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
+        if (::webView.isInitialized && webView.canGoBack()) {
             webView.goBack()
         } else {
             super.onBackPressed()
@@ -122,7 +149,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        webView.destroy()
+        if (::webView.isInitialized) {
+            webView.destroy()
+        }
         super.onDestroy()
     }
 }
