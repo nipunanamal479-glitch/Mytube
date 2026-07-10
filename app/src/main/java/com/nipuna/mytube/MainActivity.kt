@@ -9,7 +9,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -22,12 +22,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var swipeRefresh: SwipeRefreshLayout
-    private lateinit var emptyStateLayout: FrameLayout
+    private lateinit var emptyStateLayout: LinearLayout
 
     private val homeUrl = "https://m.youtube.com"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Global crash catcher - error eka screen ekema penna
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             runOnUiThread {
                 try {
