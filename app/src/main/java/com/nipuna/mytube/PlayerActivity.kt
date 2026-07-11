@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
@@ -34,13 +36,26 @@ class PlayerActivity : AppCompatActivity() {
 
         backButton.setOnClickListener { finish() }
 
-        playerWebView.settings.javaScriptEnabled = true
-        playerWebView.settings.mediaPlaybackRequiresUserGesture = false
-        playerWebView.settings.domStorageEnabled = true
+        playerWebView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            loadWithOverviewMode = true
+            useWideViewPort = true
+        }
 
         playerWebView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                playerProgressBar.visibility = View.GONE
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
                 playerProgressBar.visibility = View.GONE
             }
         }
@@ -48,25 +63,8 @@ class PlayerActivity : AppCompatActivity() {
         playerWebView.webChromeClient = WebChromeClient()
 
         if (!videoId.isNullOrBlank()) {
-            val embedHtml = """
-                <html>
-                <body style="margin:0;padding:0;background:#000;">
-                <iframe width="100%" height="100%"
-                    src="https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
-                </body>
-                </html>
-            """.trimIndent()
-            playerWebView.loadDataWithBaseURL(
-                "https://www.youtube.com",
-                embedHtml,
-                "text/html",
-                "utf-8",
-                null
-            )
+            val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0"
+            playerWebView.loadUrl(embedUrl)
         } else {
             playerProgressBar.visibility = View.GONE
         }
