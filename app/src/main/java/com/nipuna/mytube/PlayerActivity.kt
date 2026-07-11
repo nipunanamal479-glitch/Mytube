@@ -20,7 +20,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var playerTitleTextView: TextView
     private lateinit var backButton: ImageButton
 
-    private val playerOrigin = "https://www.youtube.com"
+    private val playerOrigin = "https://mytube.app"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
