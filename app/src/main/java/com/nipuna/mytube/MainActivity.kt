@@ -3,6 +3,10 @@ package com.nipuna.mytube
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -13,6 +17,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -21,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,10 +37,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var loadingProgressBar: ProgressBar
     private lateinit var emptyStateLayout: LinearLayout
     private lateinit var emptyStateTextView: TextView
+    private lateinit var suggestionsCard: CardView
+    private lateinit var suggestionsRecyclerView: RecyclerView
 
     private lateinit var adapter: VideoAdapter
+    private lateinit var suggestionAdapter: SuggestionAdapter
+
     private var lastQuery: String = ""
     private var isShowingTrending = true
+
+    private val suggestHandler = Handler(Looper.getMainLooper())
+    private var suggestRunnable: Runnable? = null
 
     private val apiKey: String
         get() = BuildConfig.YOUTUBE_API_KEY
@@ -61,12 +74,14 @@ class MainActivity : AppCompatActivity() {
             loadingProgressBar = findViewById(R.id.loadingProgressBar)
             emptyStateLayout = findViewById(R.id.emptyStateLayout)
             emptyStateTextView = findViewById(R.id.emptyStateTextView)
+            suggestionsCard = findViewById(R.id.suggestionsCard)
+            suggestionsRecyclerView = findViewById(R.id.suggestionsRecyclerView)
 
             setupRecyclerView()
+            setupSuggestions()
             setupSearch()
             setupSwipeRefresh()
 
-            // App open unama trending videos auto load wenawa
             loadTrendingVideos()
 
         } catch (e: Exception) {
@@ -85,18 +100,90 @@ class MainActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
     }
 
+    private fun setupSuggestions() {
+        suggestionAdapter = SuggestionAdapter { suggestion ->
+            searchEditText.setText(suggestion)
+            searchEditText.setSelection(suggestion.length)
+            suggestionsCard.visibility = View.GONE
+            performSearch(suggestion)
+        }
+        suggestionsRecyclerView.layoutManager = LinearLayoutManager(this)
+        suggestionsRecyclerView.adapter = suggestionAdapter
+    }
+
     private fun setupSearch() {
         searchButton.setOnClickListener {
+            suggestionsCard.visibility = View.GONE
             performSearch()
         }
 
         searchEditText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                suggestionsCard.visibility = View.GONE
                 performSearch()
                 true
             } else {
                 false
             }
+        }
+
+        searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: Editable?) {
+                val text = s?.toString().orEmpty().trim()
+
+                suggestRunnable?.let { suggestHandler.removeCallbacks(it) }
+
+                if (text.isBlank()) {
+                    suggestionsCard.visibility = View.GONE
+                    return
+                }
+
+                val runnable = Runnable { fetchSuggestions(text) }
+                suggestRunnable = runnable
+                suggestHandler.postDelayed(runnable, 300)
+            }
+        })
+    }
+
+    private fun fetchSuggestions(query: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    SuggestClient.instance.getSuggestions(query = query)
+                }
+
+                if (response.isSuccessful) {
+                    val raw = response.body().orEmpty()
+                    val suggestions = parseSuggestions(raw)
+                    if (suggestions.isNotEmpty()) {
+                        suggestionAdapter.submitList(suggestions)
+                        suggestionsCard.visibility = View.VISIBLE
+                    } else {
+                        suggestionsCard.visibility = View.GONE
+                    }
+                }
+            } catch (e: Exception) {
+                suggestionsCard.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun parseSuggestions(raw: String): List<String> {
+        return try {
+            val jsonArray = JSONArray(raw)
+            val suggestionsArray = jsonArray.getJSONArray(1)
+            val list = mutableListOf<String>()
+            for (i in 0 until suggestionsArray.length()) {
+                val item = suggestionsArray.get(i)
+                val text = if (item is JSONArray) item.getString(0) else item.toString()
+                list.add(text)
+            }
+            list.take(8)
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -161,6 +248,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        suggestionsCard.visibility = View.GONE
         isShowingTrending = false
         lastQuery = query
         emptyStateLayout.visibility = View.GONE
