@@ -20,6 +20,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var playerTitleTextView: TextView
     private lateinit var backButton: ImageButton
 
+    private val playerOrigin = "https://www.youtube.com"
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,8 +66,9 @@ class PlayerActivity : AppCompatActivity() {
         playerWebView.webChromeClient = WebChromeClient()
 
         if (!videoId.isNullOrBlank()) {
-            val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0"
-            playerWebView.loadUrl(embedUrl)
+            val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&origin=$playerOrigin"
+            val headers = mapOf("Referer" to playerOrigin)
+            playerWebView.loadUrl(embedUrl, headers)
         } else {
             playerProgressBar.visibility = View.GONE
         }
