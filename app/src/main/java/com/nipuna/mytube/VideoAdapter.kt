@@ -9,16 +9,16 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
-import com.nipuna.mytube.model.SearchItem
+import com.nipuna.mytube.model.VideoUiModel
 
 class VideoAdapter(
     private val onVideoClick: (videoId: String, title: String) -> Unit
 ) : RecyclerView.Adapter<VideoAdapter.VideoViewHolder>() {
 
-    private val videos = mutableListOf<SearchItem>()
+    private val videos = mutableListOf<VideoUiModel>()
     private var lastAnimatedPosition = -1
 
-    fun submitList(newVideos: List<SearchItem>) {
+    fun submitList(newVideos: List<VideoUiModel>) {
         videos.clear()
         videos.addAll(newVideos)
         lastAnimatedPosition = -1
@@ -48,10 +48,7 @@ class VideoAdapter(
         }
 
         holder.itemView.setOnClickListener {
-            val videoId = item.id.videoId
-            if (videoId != null) {
-                onVideoClick(videoId, item.snippet.title)
-            }
+            onVideoClick(item.videoId, item.title)
         }
     }
 
@@ -63,16 +60,16 @@ class VideoAdapter(
         private val channelTextView: TextView = itemView.findViewById(R.id.channelTextView)
         private val channelInitialTextView: TextView = itemView.findViewById(R.id.channelInitialTextView)
 
-        fun bind(item: SearchItem) {
-            titleTextView.text = item.snippet.title
-            channelTextView.text = item.snippet.channelTitle
-            channelInitialTextView.text = item.snippet.channelTitle
+        fun bind(item: VideoUiModel) {
+            titleTextView.text = item.title
+            channelTextView.text = item.channelTitle
+            channelInitialTextView.text = item.channelTitle
                 .trim()
                 .take(1)
                 .uppercase()
 
             Glide.with(itemView.context)
-                .load(item.snippet.thumbnails.high.url)
+                .load(item.thumbnailUrl)
                 .apply(RequestOptions().centerCrop())
                 .into(thumbnailImageView)
         }
