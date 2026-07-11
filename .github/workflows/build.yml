@@ -19,8 +19,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create local.properties
-        run: echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" > local.properties
+      - name: Create gradle.properties
+        run: echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> gradle.properties
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
