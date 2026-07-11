@@ -1,43 +1,92 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:cardCornerRadius="12dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
+    app:cardBackgroundColor="@color/surface_dark"
+    app:cardCornerRadius="14dp"
     app:cardElevation="4dp"
-    android:layout_margin="8dp"
-    app:cardBackgroundColor="#1E1E1E">
+    app:cardPreventCornerOverlap="false">
 
     <LinearLayout
-        android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
-        <ImageView
-            android:id="@+id/thumbnail"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:scaleType="centerCrop" />
+            android:layout_height="200dp">
 
-        <TextView
-            android:id="@+id/videoTitle"
+            <ImageView
+                android:id="@+id/thumbnailImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@color/background_dark"
+                android:contentDescription="Video thumbnail" />
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="center"
+                android:background="@drawable/play_circle_overlay"
+                android:padding="12dp"
+                android:src="@drawable/ic_play_arrow" />
+
+        </FrameLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:maxLines="2" />
+            android:orientation="horizontal"
+            android:padding="12dp">
 
-        <TextView
-            android:id="@+id/channelName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="8dp"
-            android:textSize="13sp"
-            android:textColor="#AAAAAA" />
+            <TextView
+                android:id="@+id/channelInitialTextView"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/channel_avatar_background"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:text="?"
+                android:textColor="@color/background_dark"
+                android:textSize="15sp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/titleTextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="2"
+                    android:text="Video title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/channelTextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Channel name"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
     </LinearLayout>
+
 </androidx.cardview.widget.CardView>
