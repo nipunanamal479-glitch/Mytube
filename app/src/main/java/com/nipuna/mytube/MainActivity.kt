@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.nipuna.mytube.model.toUiModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +34,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var adapter: VideoAdapter
     private var lastQuery: String = ""
+    private var isShowingTrending = true
 
     private val apiKey: String
         get() = BuildConfig.YOUTUBE_API_KEY
@@ -63,6 +65,9 @@ class MainActivity : AppCompatActivity() {
             setupRecyclerView()
             setupSearch()
             setupSwipeRefresh()
+
+            // App open unama trending videos auto load wenawa
+            loadTrendingVideos()
 
         } catch (e: Exception) {
             showCrashScreen(e.stackTraceToString())
@@ -99,10 +104,52 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh.setColorSchemeResources(R.color.accent_teal)
         swipeRefresh.setProgressBackgroundColorSchemeResource(R.color.surface_dark)
         swipeRefresh.setOnRefreshListener {
-            if (lastQuery.isNotBlank()) {
+            if (isShowingTrending) {
+                loadTrendingVideos()
+            } else if (lastQuery.isNotBlank()) {
                 performSearch(lastQuery)
             } else {
                 swipeRefresh.isRefreshing = false
+            }
+        }
+    }
+
+    private fun loadTrendingVideos() {
+        isShowingTrending = true
+        emptyStateLayout.visibility = View.GONE
+        loadingProgressBar.visibility = View.VISIBLE
+
+        if (apiKey.isBlank()) {
+            loadingProgressBar.visibility = View.GONE
+            swipeRefresh.isRefreshing = false
+            showEmptyState("API key eka missing. build.gradle check karanna.")
+            return
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.instance.getTrendingVideos(apiKey = apiKey)
+                }
+
+                loadingProgressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+
+                if (response.isSuccessful) {
+                    val items = response.body()?.items.orEmpty().map { it.toUiModel() }
+                    if (items.isEmpty()) {
+                        showEmptyState("Trending videos load wenne nae. Search karala try karanna.")
+                    } else {
+                        emptyStateLayout.visibility = View.GONE
+                        adapter.submitList(items)
+                    }
+                } else {
+                    showEmptyState("Error: HTTP ${response.code()}. API key/quota check karanna.")
+                }
+            } catch (e: Exception) {
+                loadingProgressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+                showEmptyState("Network error: ${e.message}")
             }
         }
     }
@@ -114,6 +161,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        isShowingTrending = false
         lastQuery = query
         emptyStateLayout.visibility = View.GONE
         loadingProgressBar.visibility = View.VISIBLE
@@ -135,15 +183,14 @@ class MainActivity : AppCompatActivity() {
                 swipeRefresh.isRefreshing = false
 
                 if (response.isSuccessful) {
-                    val items = response.body()?.items.orEmpty()
+                    val items = response.body()?.items.orEmpty().mapNotNull { it.toUiModel() }
                     if (items.isEmpty()) {
                         showEmptyState("Results hambune nae. Wena keyword ekak try karanna.")
                     } else {
                         adapter.submitList(items)
                     }
                 } else {
-                    val code = response.code()
-                    showEmptyState("Error: HTTP $code. API key/quota check karanna.")
+                    showEmptyState("Error: HTTP ${response.code()}. API key/quota check karanna.")
                 }
             } catch (e: Exception) {
                 loadingProgressBar.visibility = View.GONE
